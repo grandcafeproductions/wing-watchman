@@ -38,6 +38,10 @@ export const Route = createRootRoute({
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
       { name: "twitter:site", content: "@Lovable" },
+      { name: "twitter:title", content: "ChatB Flight Alert" },
+      { name: "twitter:description", content: "Live flight alert pushing events with smart, limit-aware API scheduling." },
+      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/e6617dd4-46e6-432e-a8b4-81ba5e2ba036/id-preview-9e8f7b79--4e48aae0-6788-46e4-8e73-d49ede42fd2c.lovable.app-1777740979039.png" },
+      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/e6617dd4-46e6-432e-a8b4-81ba5e2ba036/id-preview-9e8f7b79--4e48aae0-6788-46e4-8e73-d49ede42fd2c.lovable.app-1777740979039.png" },
     ],
     links: [
       {
