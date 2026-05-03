@@ -6,7 +6,8 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { formatInTz } from "@/lib/airports";
-import { Plane, ArrowRight } from "lucide-react";
+import { Plane, ArrowRight, ChevronRight } from "lucide-react";
+import { Fragment } from "react";
 
 export const Route = createFileRoute("/dashboard/subscriptions")({
   component: Subs,
@@ -25,6 +26,7 @@ function Subs() {
   const [open, setOpen] = useState<any | null>(null);
   const [jobs, setJobs] = useState<any[]>([]);
   const [logs, setLogs] = useState<any[]>([]);
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
 
   async function load() {
     const { data } = await supabase.from("subscriptions").select("*").order("created_at", { ascending: false });
@@ -145,6 +147,7 @@ function Subs() {
                   <Table>
                     <TableHeader>
                       <TableRow>
+                        <TableHead className="w-8"></TableHead>
                         <TableHead>When</TableHead>
                         <TableHead>Endpoint</TableHead>
                         <TableHead>HTTP</TableHead>
@@ -152,19 +155,47 @@ function Subs() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {logs.length === 0 && <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground">None yet</TableCell></TableRow>}
-                      {logs.map((l) => (
-                        <TableRow key={l.id}>
-                          <TableCell className="text-xs">{new Date(l.created_at).toLocaleString()}</TableCell>
-                          <TableCell className="font-mono text-xs">/{l.endpoint}</TableCell>
-                          <TableCell className="text-xs">{l.http_status}</TableCell>
-                          <TableCell>
-                            {l.success
-                              ? <Badge className="bg-success text-success-foreground">success</Badge>
-                              : <Badge variant="destructive">{l.error?.slice(0, 40) ?? "failed"}</Badge>}
-                          </TableCell>
-                        </TableRow>
-                      ))}
+                      {logs.length === 0 && <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground">None yet</TableCell></TableRow>}
+                      {logs.map((l) => {
+                        const isOpen = !!expanded[l.id];
+                        return (
+                          <Fragment key={l.id}>
+                            <TableRow className="cursor-pointer" onClick={() => setExpanded((s) => ({ ...s, [l.id]: !s[l.id] }))}>
+                              <TableCell><ChevronRight className={`h-3.5 w-3.5 transition-transform ${isOpen ? "rotate-90" : ""}`} /></TableCell>
+                              <TableCell className="text-xs">{new Date(l.created_at).toLocaleString()}</TableCell>
+                              <TableCell className="font-mono text-xs">/{l.endpoint}</TableCell>
+                              <TableCell className="text-xs">{l.http_status}</TableCell>
+                              <TableCell>
+                                {l.success
+                                  ? <Badge className="bg-success text-success-foreground">success</Badge>
+                                  : <Badge variant="destructive">{l.error?.slice(0, 40) ?? "failed"}</Badge>}
+                              </TableCell>
+                            </TableRow>
+                            {isOpen && (
+                              <TableRow>
+                                <TableCell colSpan={5} className="bg-muted/40">
+                                  <div className="space-y-2">
+                                    <div>
+                                      <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">Request params</div>
+                                      <pre className="text-xs bg-background border rounded p-2 overflow-auto max-h-48">{JSON.stringify(l.request_params, null, 2)}</pre>
+                                    </div>
+                                    <div>
+                                      <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">Response</div>
+                                      <pre className="text-xs bg-background border rounded p-2 overflow-auto max-h-96">{JSON.stringify(l.response, null, 2)}</pre>
+                                    </div>
+                                    {l.error && (
+                                      <div>
+                                        <div className="text-[10px] uppercase tracking-wider text-destructive mb-1">Error</div>
+                                        <pre className="text-xs bg-background border rounded p-2 overflow-auto max-h-32">{l.error}</pre>
+                                      </div>
+                                    )}
+                                  </div>
+                                </TableCell>
+                              </TableRow>
+                            )}
+                          </Fragment>
+                        );
+                      })}
                     </TableBody>
                   </Table>
                 </div>
