@@ -51,11 +51,14 @@ function Overview() {
     const week = new Date(now.getTime() - 7 * 24 * 3600 * 1000).toISOString();
     const month = new Date(now.getTime() - 30 * 24 * 3600 * 1000).toISOString();
 
-    const [{ count: active }, logs, { count: upcoming }, { count: failed }] = await Promise.all([
+    const [{ count: active }, logs, { count: upcoming }, { count: failed }, { count: totalSubs }, { count: totalJobs }, { count: totalLogsAll }] = await Promise.all([
       supabase.from("subscriptions").select("*", { count: "exact", head: true }).not("status", "in", "(COMPLETED,CANCELLED,FAILED)"),
       supabase.from("api_call_logs").select("endpoint, success, created_at, duration_ms").gte("created_at", month),
       supabase.from("scheduled_jobs").select("*", { count: "exact", head: true }).eq("status", "pending").gte("run_at", now.toISOString()),
       supabase.from("api_call_logs").select("*", { count: "exact", head: true }).eq("success", false).gte("created_at", month),
+      supabase.from("subscriptions").select("*", { count: "exact", head: true }),
+      supabase.from("scheduled_jobs").select("*", { count: "exact", head: true }),
+      supabase.from("api_call_logs").select("*", { count: "exact", head: true }),
     ]);
 
     const rows = (logs.data ?? []) as Array<{ endpoint: string; success: boolean; created_at: string; duration_ms: number | null }>;
