@@ -37,18 +37,23 @@ function Overview() {
 
     const [{ count: active }, logs, { count: upcoming }, { count: failed }] = await Promise.all([
       supabase.from("subscriptions").select("*", { count: "exact", head: true }).not("status", "in", "(COMPLETED,CANCELLED,FAILED)"),
-      supabase.from("api_call_logs").select("endpoint, success, created_at").gte("created_at", month),
+      supabase.from("api_call_logs").select("endpoint, success, created_at, duration_ms").gte("created_at", month),
       supabase.from("scheduled_jobs").select("*", { count: "exact", head: true }).eq("status", "pending").gte("run_at", now.toISOString()),
       supabase.from("api_call_logs").select("*", { count: "exact", head: true }).eq("success", false).gte("created_at", month),
     ]);
 
-    const rows = logs.data ?? [];
-    const isGet = (e: string) => e === "schedules" || e === "flight"; // all AirLabs are GET; "post" tracked similarly
+    const rows = (logs.data ?? []) as Array<{ endpoint: string; success: boolean; created_at: string; duration_ms: number | null }>;
     const inRange = (iso: string, since: string) => iso >= since;
-    // Treat schedules as GET-style data fetch and flight as POST-style live polling for the user's UI buckets.
     const get = rows.filter((r) => r.endpoint === "schedules");
     const post = rows.filter((r) => r.endpoint === "flight");
     const cnt = (arr: any[], since: string) => arr.filter((r) => inRange(r.created_at, since)).length;
+
+    const durations = rows.map((r) => r.duration_ms ?? 0).filter((n) => n > 0).sort((a, b) => a - b);
+    const avg = durations.length ? Math.round(durations.reduce((a, b) => a + b, 0) / durations.length) : 0;
+    const p95 = durations.length ? durations[Math.floor(durations.length * 0.95)] ?? durations[durations.length - 1] : 0;
+    const succ = rows.length ? Math.round(((rows.length - (failed ?? 0)) / rows.length) * 1000) / 10 : 100;
+    const hourAgo = new Date(now.getTime() - 3600 * 1000).toISOString();
+    const callsLastHour = cnt(rows, hourAgo);
 
     setS({
       active: active ?? 0,
@@ -56,6 +61,11 @@ function Overview() {
       postDay: cnt(post, day), postWeek: cnt(post, week), postMonth: cnt(post, month),
       upcoming: upcoming ?? 0,
       failed: failed ?? 0,
+      avgLatency: avg,
+      p95Latency: p95,
+      successRate: succ,
+      callsLastHour,
+      totalLogs: rows.length,
     });
   }
 
