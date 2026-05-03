@@ -103,20 +103,33 @@ function Subs() {
                 </DialogDescription>
               </DialogHeader>
 
+              {(() => {
+                const depTz = getTz(open.dep_iata);
+                const arrTz = getTz(open.arr_iata);
+                const fmtBoth = (iso?: string | null) => {
+                  if (!iso) return "—";
+                  return (
+                    <div className="space-y-0.5">
+                      <div>{formatInTz(iso, depTz)} <span className="text-[10px] text-muted-foreground">{depTz}</span></div>
+                      <div>{formatInTz(iso, arrTz)} <span className="text-[10px] text-muted-foreground">{arrTz}</span></div>
+                    </div>
+                  );
+                };
+                return (
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 <Field label="Status" v={<Badge variant="outline" className={statusTone[open.status] ?? ""}>{open.status_normalized ?? open.status}</Badge>} />
                 <Field label="Phase" v={open.phase} />
                 <Field label="API calls" v={`${open.api_call_count} / 10`} />
                 <Field label="Failed calls" v={open.failed_api_count} />
 
-                <Field label={`Scheduled departure (${open.timezone})`} v={formatInTz(open.dep_time_utc, open.timezone)} />
-                <Field label="Estimated departure" v={open.dep_estimated_utc ? formatInTz(open.dep_estimated_utc, open.timezone) : "—"} />
-                <Field label="Actual departure" v={open.dep_actual_utc ? formatInTz(open.dep_actual_utc, open.timezone) : "—"} />
+                <Field label="Scheduled departure" v={fmtBoth(open.dep_time_utc)} />
+                <Field label="Estimated departure" v={fmtBoth(open.dep_estimated_utc)} />
+                <Field label="Actual departure" v={fmtBoth(open.dep_actual_utc)} />
                 <Field label="Departure delay" v={open.dep_delayed != null ? `${open.dep_delayed} min` : "—"} />
 
-                <Field label="Scheduled arrival" v={open.arr_time_utc ? formatInTz(open.arr_time_utc, open.timezone) : "—"} />
-                <Field label="Estimated arrival" v={open.arr_estimated_utc ? formatInTz(open.arr_estimated_utc, open.timezone) : "—"} />
-                <Field label="Actual arrival" v={open.arr_actual_utc ? formatInTz(open.arr_actual_utc, open.timezone) : "—"} />
+                <Field label="Scheduled arrival" v={fmtBoth(open.arr_time_utc)} />
+                <Field label="Estimated arrival" v={fmtBoth(open.arr_estimated_utc)} />
+                <Field label="Actual arrival" v={fmtBoth(open.arr_actual_utc)} />
                 <Field label="Arrival delay" v={open.arr_delayed != null ? `${open.arr_delayed} min` : "—"} />
 
                 <Field label="Dep terminal" v={open.dep_terminal ?? "—"} />
@@ -126,6 +139,8 @@ function Subs() {
                 <Field label="Baggage belt" v={open.arr_baggage ?? "—"} />
                 <Field label="Duration" v={open.duration ? `${open.duration} min` : "—"} />
               </div>
+                );
+              })()}
 
               <div>
                 <h3 className="font-semibold mt-2 mb-2">Scheduled API calls</h3>
