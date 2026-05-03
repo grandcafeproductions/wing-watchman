@@ -5,7 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { formatInTz } from "@/lib/airports";
+import { formatInTz, getTz } from "@/lib/airports";
 import { Plane, ArrowRight, ChevronRight } from "lucide-react";
 import { Fragment } from "react";
 
