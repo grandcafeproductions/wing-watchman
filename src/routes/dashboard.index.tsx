@@ -15,7 +15,16 @@ type Stats = {
   postDay: number; postWeek: number; postMonth: number;
   upcoming: number;
   failed: number;
+  avgLatency: number;
+  p95Latency: number;
+  successRate: number;
+  callsLastHour: number;
+  totalLogs: number;
 };
+
+// AirLabs free tier: ~1000 calls/month. Adjust if your plan differs.
+const MONTHLY_QUOTA = 1000;
+const RATE_LIMIT_PER_MIN = 60;
 
 function Overview() {
   const [s, setS] = useState<Stats | null>(null);
