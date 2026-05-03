@@ -85,6 +85,10 @@ function Overview() {
       successRate: succ,
       callsLastHour,
       totalLogs: rows.length,
+      totalSubscriptions: totalSubs ?? 0,
+      totalJobs: totalJobs ?? 0,
+      totalRows: (totalSubs ?? 0) + (totalJobs ?? 0) + (totalLogsAll ?? 0),
+      realtimeChannels: 3,
     });
   }
 
