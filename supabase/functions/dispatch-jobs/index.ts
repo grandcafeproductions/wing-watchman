@@ -41,12 +41,17 @@ function parseAirlabsTime(t: string | null | undefined): string | null {
   return new Date(t.replace(" ", "T") + "Z").toISOString();
 }
 
+// Match the operating flight, including codeshares (cs_flight_iata)
+function mainFlightCode(f: any): string | null {
+  return f?.cs_flight_iata || f?.flight_iata || null;
+}
+
 // Smart filter for /schedules
 function pickFlight(list: any[], target: { dep_iata: string; arr_iata: string; flight_iata: string; dep_time_utc: string }) {
   if (!Array.isArray(list)) return null;
   const targetTs = new Date(target.dep_time_utc).getTime();
-  // exact flight_iata + same date first
-  const sameFlight = list.filter((f) => f.flight_iata === target.flight_iata);
+  // Match either the operating code or codeshare code
+  const sameFlight = list.filter((f) => mainFlightCode(f) === target.flight_iata || f.flight_iata === target.flight_iata);
   const candidates = sameFlight.length ? sameFlight : list.filter(
     (f) => f.dep_iata === target.dep_iata && f.arr_iata === target.arr_iata
   );
@@ -56,13 +61,44 @@ function pickFlight(list: any[], target: { dep_iata: string; arr_iata: string; f
     const t = parseAirlabsTime(f.dep_time_utc);
     if (!t) continue;
     const delta = Math.abs(new Date(t).getTime() - targetTs);
-    // within 6 hours
     if (delta < bestDelta && delta < 6 * 3600 * 1000) {
       best = f;
       bestDelta = delta;
     }
   }
   return best;
+}
+
+// Has the flight clearly departed? Use multiple signals — dep_actual_utc is often null.
+function hasDeparted(f: any): boolean {
+  if (!f) return false;
+  if (f.dep_actual_utc) return true;
+  const s = (f.status || "").toLowerCase();
+  if (s === "en-route" || s === "active" || s === "landed") return true;
+  if (typeof f.percent === "number" && f.percent > 0) return true;
+  if (typeof f.lat === "number" && typeof f.lng === "number") return true;
+  return false;
+}
+
+function hasArrived(f: any): boolean {
+  if (!f) return false;
+  if (f.arr_actual_utc) return true;
+  const s = (f.status || "").toLowerCase();
+  return s === "landed";
+}
+
+// Best-effort arrival ETA in UTC ISO from any of the available fields
+function arrivalEta(f: any, fallback: Date): Date {
+  const cand =
+    parseAirlabsTime(f?.arr_estimated_utc) ||
+    parseAirlabsTime(f?.arr_time_utc) ||
+    null;
+  if (cand) return new Date(cand);
+  // eta is "minutes to arrival" when en-route
+  if (typeof f?.eta === "number" && f.eta > 0) {
+    return new Date(Date.now() + f.eta * 60 * 1000);
+  }
+  return fallback;
 }
 
 async function logCall(subId: string, jobId: string | null, endpoint: string, params: any, r: any) {
