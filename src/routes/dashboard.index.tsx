@@ -97,6 +97,56 @@ function Overview() {
         <Bucket title="Schedules API (GET)" icon={ArrowDownToLine} d={s?.getDay} w={s?.getWeek} m={s?.getMonth} />
         <Bucket title="Flight API (POST)" icon={ArrowUpFromLine} d={s?.postDay} w={s?.postWeek} m={s?.postMonth} />
       </div>
+
+      <div>
+        <h2 className="text-xl font-semibold mb-3 flex items-center gap-2">
+          <Gauge className="h-5 w-5 text-primary" /> Backend Performance & Usage
+        </h2>
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <Stat icon={Zap} label="Avg latency" value={s ? `${s.avgLatency} ms` : "—"} accent="primary" />
+          <Stat icon={Gauge} label="P95 latency" value={s ? `${s.p95Latency} ms` : "—"} accent="sky" />
+          <Stat icon={Activity} label="Success rate (30d)" value={s ? `${s.successRate}%` : "—"} accent="success" />
+          <Stat icon={Database} label="Calls last hour" value={s?.callsLastHour ?? "—"} accent="primary" />
+        </div>
+
+        <div className="grid gap-4 md:grid-cols-2 mt-4">
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Database className="h-4 w-4 text-primary" /> Monthly API quota
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Used (30d)</span>
+                <span className="font-semibold tabular-nums">
+                  {s?.totalLogs ?? 0} / {MONTHLY_QUOTA}
+                </span>
+              </div>
+              <Progress value={s ? Math.min(100, (s.totalLogs / MONTHLY_QUOTA) * 100) : 0} />
+              <p className="text-xs text-muted-foreground">
+                AirLabs plan limit. Calls are split across Schedules and Flight endpoints.
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base flex items-center gap-2">
+                <ShieldAlert className="h-4 w-4 text-primary" /> Rate limits & constraints
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="text-sm space-y-1.5">
+              <Row label="API rate limit" value={`~${RATE_LIMIT_PER_MIN} req/min`} />
+              <Row label="Tracking window" value="T-7h → arrival" />
+              <Row label="Job dispatch interval" value="Every 1 min (cron)" />
+              <Row label="Max subscription rows / query" value="1000" />
+              <Row label="Webhook timeout" value="30 s" />
+              <Row label="Provider" value="AirLabs.co (single)" />
+            </CardContent>
+          </Card>
+        </div>
+      </div>
     </div>
   );
 }
