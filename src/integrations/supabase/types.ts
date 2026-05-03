@@ -138,17 +138,26 @@ export type Database = {
           airline_iata: string
           api_call_count: number
           arr_actual_utc: string | null
+          arr_baggage: string | null
           arr_city: string | null
+          arr_delayed: number | null
           arr_estimated_utc: string | null
+          arr_gate: string | null
           arr_iata: string
+          arr_terminal: string | null
           arr_time_utc: string | null
+          arr_timezone: string | null
           created_at: string
           dep_actual_utc: string | null
           dep_city: string | null
+          dep_delayed: number | null
           dep_estimated_utc: string | null
+          dep_gate: string | null
           dep_iata: string
           dep_local_datetime: string
+          dep_terminal: string | null
           dep_time_utc: string
+          duration: number | null
           failed_api_count: number
           flight_iata: string
           flight_number: string
@@ -159,6 +168,7 @@ export type Database = {
           phase: string
           retry_count: number
           status: string
+          status_normalized: string | null
           timezone: string
           updated_at: string
         }
@@ -166,17 +176,26 @@ export type Database = {
           airline_iata: string
           api_call_count?: number
           arr_actual_utc?: string | null
+          arr_baggage?: string | null
           arr_city?: string | null
+          arr_delayed?: number | null
           arr_estimated_utc?: string | null
+          arr_gate?: string | null
           arr_iata: string
+          arr_terminal?: string | null
           arr_time_utc?: string | null
+          arr_timezone?: string | null
           created_at?: string
           dep_actual_utc?: string | null
           dep_city?: string | null
+          dep_delayed?: number | null
           dep_estimated_utc?: string | null
+          dep_gate?: string | null
           dep_iata: string
           dep_local_datetime: string
+          dep_terminal?: string | null
           dep_time_utc: string
+          duration?: number | null
           failed_api_count?: number
           flight_iata: string
           flight_number: string
@@ -187,6 +206,7 @@ export type Database = {
           phase?: string
           retry_count?: number
           status?: string
+          status_normalized?: string | null
           timezone?: string
           updated_at?: string
         }
@@ -194,17 +214,26 @@ export type Database = {
           airline_iata?: string
           api_call_count?: number
           arr_actual_utc?: string | null
+          arr_baggage?: string | null
           arr_city?: string | null
+          arr_delayed?: number | null
           arr_estimated_utc?: string | null
+          arr_gate?: string | null
           arr_iata?: string
+          arr_terminal?: string | null
           arr_time_utc?: string | null
+          arr_timezone?: string | null
           created_at?: string
           dep_actual_utc?: string | null
           dep_city?: string | null
+          dep_delayed?: number | null
           dep_estimated_utc?: string | null
+          dep_gate?: string | null
           dep_iata?: string
           dep_local_datetime?: string
+          dep_terminal?: string | null
           dep_time_utc?: string
+          duration?: number | null
           failed_api_count?: number
           flight_iata?: string
           flight_number?: string
@@ -215,6 +244,7 @@ export type Database = {
           phase?: string
           retry_count?: number
           status?: string
+          status_normalized?: string | null
           timezone?: string
           updated_at?: string
         }
