@@ -16,6 +16,7 @@ import { Route as DashboardIndexRouteImport } from './routes/dashboard.index'
 import { Route as DashboardSubscriptionsRouteImport } from './routes/dashboard.subscriptions'
 import { Route as DashboardProvidersRouteImport } from './routes/dashboard.providers'
 import { Route as DashboardNewRouteImport } from './routes/dashboard.new'
+import { Route as ApiPublicSubscriptionsRouteImport } from './routes/api/public/subscriptions'
 
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
@@ -52,6 +53,11 @@ const DashboardNewRoute = DashboardNewRouteImport.update({
   path: '/new',
   getParentRoute: () => DashboardRoute,
 } as any)
+const ApiPublicSubscriptionsRoute = ApiPublicSubscriptionsRouteImport.update({
+  id: '/api/public/subscriptions',
+  path: '/api/public/subscriptions',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -61,6 +67,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/providers': typeof DashboardProvidersRoute
   '/dashboard/subscriptions': typeof DashboardSubscriptionsRoute
   '/dashboard/': typeof DashboardIndexRoute
+  '/api/public/subscriptions': typeof ApiPublicSubscriptionsRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -69,6 +76,7 @@ export interface FileRoutesByTo {
   '/dashboard/providers': typeof DashboardProvidersRoute
   '/dashboard/subscriptions': typeof DashboardSubscriptionsRoute
   '/dashboard': typeof DashboardIndexRoute
+  '/api/public/subscriptions': typeof ApiPublicSubscriptionsRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -79,6 +87,7 @@ export interface FileRoutesById {
   '/dashboard/providers': typeof DashboardProvidersRoute
   '/dashboard/subscriptions': typeof DashboardSubscriptionsRoute
   '/dashboard/': typeof DashboardIndexRoute
+  '/api/public/subscriptions': typeof ApiPublicSubscriptionsRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -90,6 +99,7 @@ export interface FileRouteTypes {
     | '/dashboard/providers'
     | '/dashboard/subscriptions'
     | '/dashboard/'
+    | '/api/public/subscriptions'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -98,6 +108,7 @@ export interface FileRouteTypes {
     | '/dashboard/providers'
     | '/dashboard/subscriptions'
     | '/dashboard'
+    | '/api/public/subscriptions'
   id:
     | '__root__'
     | '/'
@@ -107,12 +118,14 @@ export interface FileRouteTypes {
     | '/dashboard/providers'
     | '/dashboard/subscriptions'
     | '/dashboard/'
+    | '/api/public/subscriptions'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   DashboardRoute: typeof DashboardRouteWithChildren
   LoginRoute: typeof LoginRoute
+  ApiPublicSubscriptionsRoute: typeof ApiPublicSubscriptionsRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -166,6 +179,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardNewRouteImport
       parentRoute: typeof DashboardRoute
     }
+    '/api/public/subscriptions': {
+      id: '/api/public/subscriptions'
+      path: '/api/public/subscriptions'
+      fullPath: '/api/public/subscriptions'
+      preLoaderRoute: typeof ApiPublicSubscriptionsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -191,6 +211,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   DashboardRoute: DashboardRouteWithChildren,
   LoginRoute: LoginRoute,
+  ApiPublicSubscriptionsRoute: ApiPublicSubscriptionsRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
