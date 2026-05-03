@@ -2,7 +2,8 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Activity, ArrowDownToLine, ArrowUpFromLine, Clock, AlertTriangle } from "lucide-react";
+import { Activity, ArrowDownToLine, ArrowUpFromLine, Clock, AlertTriangle, Gauge, Database, ShieldAlert, Zap } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
 
 export const Route = createFileRoute("/dashboard/")({
   component: Overview,
