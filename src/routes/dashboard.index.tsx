@@ -20,11 +20,27 @@ type Stats = {
   successRate: number;
   callsLastHour: number;
   totalLogs: number;
+  // Lovable Cloud (Supabase) usage
+  totalSubscriptions: number;
+  totalJobs: number;
+  totalRows: number;
+  realtimeChannels: number;
 };
 
-// AirLabs free tier: ~1000 calls/month. Adjust if your plan differs.
 const MONTHLY_QUOTA = 1000;
 const RATE_LIMIT_PER_MIN = 60;
+// Lovable Cloud free-tier soft limits (display only)
+const CLOUD_DB_ROWS_LIMIT = 500_000;
+const CLOUD_EGRESS_GB = 5;
+
+function Row({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex justify-between border-b last:border-0 py-1.5">
+      <span className="text-muted-foreground">{label}</span>
+      <span className="font-medium tabular-nums">{value}</span>
+    </div>
+  );
+}
 
 function Overview() {
   const [s, setS] = useState<Stats | null>(null);
@@ -35,11 +51,14 @@ function Overview() {
     const week = new Date(now.getTime() - 7 * 24 * 3600 * 1000).toISOString();
     const month = new Date(now.getTime() - 30 * 24 * 3600 * 1000).toISOString();
 
-    const [{ count: active }, logs, { count: upcoming }, { count: failed }] = await Promise.all([
+    const [{ count: active }, logs, { count: upcoming }, { count: failed }, { count: totalSubs }, { count: totalJobs }, { count: totalLogsAll }] = await Promise.all([
       supabase.from("subscriptions").select("*", { count: "exact", head: true }).not("status", "in", "(COMPLETED,CANCELLED,FAILED)"),
       supabase.from("api_call_logs").select("endpoint, success, created_at, duration_ms").gte("created_at", month),
       supabase.from("scheduled_jobs").select("*", { count: "exact", head: true }).eq("status", "pending").gte("run_at", now.toISOString()),
       supabase.from("api_call_logs").select("*", { count: "exact", head: true }).eq("success", false).gte("created_at", month),
+      supabase.from("subscriptions").select("*", { count: "exact", head: true }),
+      supabase.from("scheduled_jobs").select("*", { count: "exact", head: true }),
+      supabase.from("api_call_logs").select("*", { count: "exact", head: true }),
     ]);
 
     const rows = (logs.data ?? []) as Array<{ endpoint: string; success: boolean; created_at: string; duration_ms: number | null }>;
@@ -66,6 +85,10 @@ function Overview() {
       successRate: succ,
       callsLastHour,
       totalLogs: rows.length,
+      totalSubscriptions: totalSubs ?? 0,
+      totalJobs: totalJobs ?? 0,
+      totalRows: (totalSubs ?? 0) + (totalJobs ?? 0) + (totalLogsAll ?? 0),
+      realtimeChannels: 3,
     });
   }
 
@@ -147,6 +170,60 @@ function Overview() {
           </Card>
         </div>
       </div>
+
+      <div>
+        <h2 className="text-xl font-semibold mb-3 flex items-center gap-2">
+          <Database className="h-5 w-5 text-primary" /> Lovable Cloud (Backend) Usage
+        </h2>
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <Stat icon={Database} label="Subscriptions rows" value={s?.totalSubscriptions ?? "—"} accent="primary" />
+          <Stat icon={Clock} label="Scheduled jobs rows" value={s?.totalJobs ?? "—"} accent="sky" />
+          <Stat icon={Activity} label="API log rows (all-time)" value={s?.totalLogs ?? "—"} accent="success" />
+          <Stat icon={Zap} label="Realtime channels" value={s?.realtimeChannels ?? "—"} accent="primary" />
+        </div>
+
+        <div className="grid gap-4 md:grid-cols-2 mt-4">
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Database className="h-4 w-4 text-primary" /> Database rows used
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Total rows across tables</span>
+                <span className="font-semibold tabular-nums">
+                  {s?.totalRows ?? 0} / {CLOUD_DB_ROWS_LIMIT.toLocaleString()}
+                </span>
+              </div>
+              <Progress value={s ? Math.min(100, (s.totalRows / CLOUD_DB_ROWS_LIMIT) * 100) : 0} />
+              <p className="text-xs text-muted-foreground">
+                Lovable Cloud free-tier soft cap. Live data; tables: subscriptions, scheduled_jobs, api_call_logs.
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base flex items-center gap-2">
+                <ShieldAlert className="h-4 w-4 text-primary" /> Cloud limits & constraints
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="text-sm space-y-1.5">
+              <Row label="Provider" value="Lovable Cloud (Postgres)" />
+              <Row label="Default query row limit" value="1000" />
+              <Row label="Egress (free tier)" value={`${CLOUD_EGRESS_GB} GB / month`} />
+              <Row label="Realtime channels" value="Up to 200 concurrent" />
+              <Row label="Auth users (free tier)" value="50,000 MAU" />
+              <Row label="Storage (free tier)" value="1 GB" />
+              <Row label="Edge function timeout" value="150 s" />
+            </CardContent>
+          </Card>
+        </div>
+        <p className="text-xs text-muted-foreground mt-2">
+          For exact billing & live quotas, open <strong>Lovable Cloud → Overview</strong> from the project sidebar.
+        </p>
+      </div>
     </div>
   );
 }
@@ -195,11 +272,3 @@ function Bucket({ title, icon: Icon, d, w, m }: any) {
   );
 }
 
-function Row({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex justify-between border-b last:border-0 py-1.5">
-      <span className="text-muted-foreground">{label}</span>
-      <span className="font-medium tabular-nums">{value}</span>
-    </div>
-  );
-}
