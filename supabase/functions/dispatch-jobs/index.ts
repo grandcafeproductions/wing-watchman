@@ -41,12 +41,17 @@ function parseAirlabsTime(t: string | null | undefined): string | null {
   return new Date(t.replace(" ", "T") + "Z").toISOString();
 }
 
+// Match the operating flight, including codeshares (cs_flight_iata)
+function mainFlightCode(f: any): string | null {
+  return f?.cs_flight_iata || f?.flight_iata || null;
+}
+
 // Smart filter for /schedules
 function pickFlight(list: any[], target: { dep_iata: string; arr_iata: string; flight_iata: string; dep_time_utc: string }) {
   if (!Array.isArray(list)) return null;
   const targetTs = new Date(target.dep_time_utc).getTime();
-  // exact flight_iata + same date first
-  const sameFlight = list.filter((f) => f.flight_iata === target.flight_iata);
+  // Match either the operating code or codeshare code
+  const sameFlight = list.filter((f) => mainFlightCode(f) === target.flight_iata || f.flight_iata === target.flight_iata);
   const candidates = sameFlight.length ? sameFlight : list.filter(
     (f) => f.dep_iata === target.dep_iata && f.arr_iata === target.arr_iata
   );
@@ -56,13 +61,44 @@ function pickFlight(list: any[], target: { dep_iata: string; arr_iata: string; f
     const t = parseAirlabsTime(f.dep_time_utc);
     if (!t) continue;
     const delta = Math.abs(new Date(t).getTime() - targetTs);
-    // within 6 hours
     if (delta < bestDelta && delta < 6 * 3600 * 1000) {
       best = f;
       bestDelta = delta;
     }
   }
   return best;
+}
+
+// Has the flight clearly departed? Use multiple signals — dep_actual_utc is often null.
+function hasDeparted(f: any): boolean {
+  if (!f) return false;
+  if (f.dep_actual_utc) return true;
+  const s = (f.status || "").toLowerCase();
+  if (s === "en-route" || s === "active" || s === "landed") return true;
+  if (typeof f.percent === "number" && f.percent > 0) return true;
+  if (typeof f.lat === "number" && typeof f.lng === "number") return true;
+  return false;
+}
+
+function hasArrived(f: any): boolean {
+  if (!f) return false;
+  if (f.arr_actual_utc) return true;
+  const s = (f.status || "").toLowerCase();
+  return s === "landed";
+}
+
+// Best-effort arrival ETA in UTC ISO from any of the available fields
+function arrivalEta(f: any, fallback: Date): Date {
+  const cand =
+    parseAirlabsTime(f?.arr_estimated_utc) ||
+    parseAirlabsTime(f?.arr_time_utc) ||
+    null;
+  if (cand) return new Date(cand);
+  // eta is "minutes to arrival" when en-route
+  if (typeof f?.eta === "number" && f.eta > 0) {
+    return new Date(Date.now() + f.eta * 60 * 1000);
+  }
+  return fallback;
 }
 
 async function logCall(subId: string, jobId: string | null, endpoint: string, params: any, r: any) {
@@ -212,9 +248,12 @@ async function processJob(job: any) {
       await supabase.from("subscriptions").update({ phase: "DEPARTURE_TRACKING", retry_count: 0 }).eq("id", sub.id);
       await scheduleJob(sub.id, "CHECK_DEPARTURE", "DEPARTURE_TRACKING", next < now ? new Date(now.getTime() + 60_000) : next);
     } else if (phase === "DEPARTURE_TRACKING") {
-      if (flight.dep_actual_utc) {
+      if (hasArrived(flight)) {
+        await supabase.from("subscriptions").update({ status: "COMPLETED", phase: "COMPLETED" }).eq("id", sub.id);
+      } else if (hasDeparted(flight)) {
         await supabase.from("subscriptions").update({ phase: "ARRIVAL_TRACKING", retry_count: 0 }).eq("id", sub.id);
-        const next = new Date(arrEst.getTime() + 5 * 60 * 1000);
+        const eta = arrivalEta(flight, arrEst);
+        const next = new Date(eta.getTime() + 5 * 60 * 1000);
         await scheduleJob(sub.id, "CHECK_ARRIVAL", "ARRIVAL_TRACKING", next < now ? new Date(now.getTime() + 60_000) : next);
       } else {
         const rc = sub.retry_count + 1;
@@ -226,16 +265,22 @@ async function processJob(job: any) {
         }
       }
     } else if (phase === "ARRIVAL_TRACKING") {
-      if (flight.arr_actual_utc || fStatus === "landed") {
+      if (hasArrived(flight)) {
         await supabase.from("subscriptions").update({ status: "COMPLETED", phase: "COMPLETED" }).eq("id", sub.id);
       } else {
+        // Still en-route — re-poll near updated ETA
+        const eta = arrivalEta(flight, arrEst);
+        const minutesToEta = Math.round((eta.getTime() - now.getTime()) / 60000);
         const rc = sub.retry_count + 1;
-        if (rc >= 3) {
+        if (rc >= 5) {
           await supabase.from("subscriptions").update({ status: "FAILED", phase: "ARRIVAL_NOT_DETECTED" }).eq("id", sub.id);
         } else {
-          const wait = rc === 1 ? 10 : 30;
+          // If ETA is far away, sleep until ~5 min before; otherwise poll every 10 min
+          let waitMin: number;
+          if (minutesToEta > 30) waitMin = Math.min(minutesToEta - 5, 60);
+          else waitMin = 10;
           await supabase.from("subscriptions").update({ retry_count: rc }).eq("id", sub.id);
-          await scheduleJob(sub.id, "CHECK_ARRIVAL", "ARRIVAL_TRACKING", new Date(now.getTime() + wait * 60 * 1000));
+          await scheduleJob(sub.id, "CHECK_ARRIVAL", "ARRIVAL_TRACKING", new Date(now.getTime() + waitMin * 60 * 1000));
         }
       }
     }
