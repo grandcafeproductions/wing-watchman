@@ -194,3 +194,12 @@ function Bucket({ title, icon: Icon, d, w, m }: any) {
     </Card>
   );
 }
+
+function Row({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex justify-between border-b last:border-0 py-1.5">
+      <span className="text-muted-foreground">{label}</span>
+      <span className="font-medium tabular-nums">{value}</span>
+    </div>
+  );
+}
