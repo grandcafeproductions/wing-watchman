@@ -20,11 +20,27 @@ type Stats = {
   successRate: number;
   callsLastHour: number;
   totalLogs: number;
+  // Lovable Cloud (Supabase) usage
+  totalSubscriptions: number;
+  totalJobs: number;
+  totalRows: number;
+  realtimeChannels: number;
 };
 
-// AirLabs free tier: ~1000 calls/month. Adjust if your plan differs.
 const MONTHLY_QUOTA = 1000;
 const RATE_LIMIT_PER_MIN = 60;
+// Lovable Cloud free-tier soft limits (display only)
+const CLOUD_DB_ROWS_LIMIT = 500_000;
+const CLOUD_EGRESS_GB = 5;
+
+function Row({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex justify-between border-b last:border-0 py-1.5">
+      <span className="text-muted-foreground">{label}</span>
+      <span className="font-medium tabular-nums">{value}</span>
+    </div>
+  );
+}
 
 function Overview() {
   const [s, setS] = useState<Stats | null>(null);
