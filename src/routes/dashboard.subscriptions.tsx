@@ -104,14 +104,27 @@ function Subs() {
               </DialogHeader>
 
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                <Field label="Status" v={<Badge variant="outline" className={statusTone[open.status] ?? ""}>{open.status}</Badge>} />
+                <Field label="Status" v={<Badge variant="outline" className={statusTone[open.status] ?? ""}>{open.status_normalized ?? open.status}</Badge>} />
                 <Field label="Phase" v={open.phase} />
                 <Field label="API calls" v={`${open.api_call_count} / 10`} />
-                <Field label="Failed" v={open.failed_api_count} />
+                <Field label="Failed calls" v={open.failed_api_count} />
+
+                <Field label={`Scheduled departure (${open.timezone})`} v={formatInTz(open.dep_time_utc, open.timezone)} />
                 <Field label="Estimated departure" v={open.dep_estimated_utc ? formatInTz(open.dep_estimated_utc, open.timezone) : "—"} />
                 <Field label="Actual departure" v={open.dep_actual_utc ? formatInTz(open.dep_actual_utc, open.timezone) : "—"} />
+                <Field label="Departure delay" v={open.dep_delayed != null ? `${open.dep_delayed} min` : "—"} />
+
+                <Field label="Scheduled arrival" v={open.arr_time_utc ? formatInTz(open.arr_time_utc, open.timezone) : "—"} />
                 <Field label="Estimated arrival" v={open.arr_estimated_utc ? formatInTz(open.arr_estimated_utc, open.timezone) : "—"} />
                 <Field label="Actual arrival" v={open.arr_actual_utc ? formatInTz(open.arr_actual_utc, open.timezone) : "—"} />
+                <Field label="Arrival delay" v={open.arr_delayed != null ? `${open.arr_delayed} min` : "—"} />
+
+                <Field label="Dep terminal" v={open.dep_terminal ?? "—"} />
+                <Field label="Dep gate" v={open.dep_gate ?? "—"} />
+                <Field label="Arr terminal" v={open.arr_terminal ?? "—"} />
+                <Field label="Arr gate" v={open.arr_gate ?? "—"} />
+                <Field label="Baggage belt" v={open.arr_baggage ?? "—"} />
+                <Field label="Duration" v={open.duration ? `${open.duration} min` : "—"} />
               </div>
 
               <div>

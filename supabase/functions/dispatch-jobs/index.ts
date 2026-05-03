@@ -14,6 +14,34 @@ const AIRLABS_KEY = Deno.env.get("AIRLABS_API_KEY")!;
 const supabase = createClient(SUPABASE_URL, SERVICE_KEY);
 
 const TERMINAL = ["COMPLETED", "CANCELLED", "FAILED"];
+const WEBHOOK_URL = "https://backbin.colaber.in/webhook/flyt";
+
+// Normalize wildly varying status strings into a canonical set
+function normalizeStatus(s: string | null | undefined): string {
+  const x = (s || "").toLowerCase().replace(/[_\s]/g, "-");
+  if (!x) return "unknown";
+  if (x === "enroute" || x === "en-route" || x === "active" || x === "airborne") return "en-route";
+  if (x === "scheduled" || x === "on-time" || x === "ontime") return "scheduled";
+  if (x === "landed" || x === "arrived") return "landed";
+  if (x === "cancelled" || x === "canceled") return "cancelled";
+  if (x === "diverted") return "diverted";
+  if (x === "delayed") return "delayed";
+  if (x === "incident") return "incident";
+  if (x === "redirected") return "diverted";
+  return x;
+}
+
+async function postWebhook(payload: any) {
+  try {
+    await fetch(WEBHOOK_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+  } catch (e) {
+    console.error("webhook fail", e);
+  }
+}
 
 async function airlabs(endpoint: string, params: Record<string, string>) {
   const url = new URL(`https://airlabs.co/api/v9/${endpoint}`);
@@ -205,28 +233,53 @@ async function processJob(job: any) {
   }
 
   if (flight) {
+    const normStatus = normalizeStatus(flight.status);
     const update: any = {
       last_response: flight,
       last_status_text: flight.status,
+      status_normalized: normStatus,
       dep_estimated_utc: parseAirlabsTime(flight.dep_estimated_utc) ?? sub.dep_estimated_utc,
       arr_estimated_utc: parseAirlabsTime(flight.arr_estimated_utc) ?? sub.arr_estimated_utc,
       dep_actual_utc: parseAirlabsTime(flight.dep_actual_utc) ?? sub.dep_actual_utc,
       arr_actual_utc: parseAirlabsTime(flight.arr_actual_utc) ?? sub.arr_actual_utc,
       arr_time_utc: parseAirlabsTime(flight.arr_time_utc) ?? sub.arr_time_utc,
+      dep_gate: flight.dep_gate ?? sub.dep_gate,
+      dep_terminal: flight.dep_terminal ?? sub.dep_terminal,
+      arr_gate: flight.arr_gate ?? sub.arr_gate,
+      arr_terminal: flight.arr_terminal ?? sub.arr_terminal,
+      arr_baggage: flight.arr_baggage ?? sub.arr_baggage,
+      dep_delayed: typeof flight.dep_delayed === "number" ? flight.dep_delayed : sub.dep_delayed,
+      arr_delayed: typeof flight.arr_delayed === "number" ? flight.arr_delayed : sub.arr_delayed,
+      duration: typeof flight.duration === "number" ? flight.duration : sub.duration,
     };
 
-    const fStatus = (flight.status || "").toLowerCase();
-    if (fStatus === "cancelled") {
+    // Push raw flight payload to external webhook
+    await postWebhook({
+      subscription_id: sub.id,
+      flight_iata: sub.flight_iata,
+      phase,
+      endpoint,
+      fetched_at: new Date().toISOString(),
+      flight,
+    });
+
+    if (normStatus === "cancelled") {
       update.status = "CANCELLED";
       update.phase = "CANCELLED";
       await supabase.from("subscriptions").update(update).eq("id", sub.id);
       return finalizeJob(job.id, { cancelled: true });
     }
-    if (fStatus === "landed") {
+    if (normStatus === "landed") {
       update.status = "COMPLETED";
       update.phase = "COMPLETED";
       await supabase.from("subscriptions").update(update).eq("id", sub.id);
       return finalizeJob(job.id, { landed: true });
+    }
+    if (normStatus === "diverted") {
+      update.status = "FAILED";
+      update.phase = "DIVERTED";
+      await supabase.from("subscriptions").update(update).eq("id", sub.id);
+      return finalizeJob(job.id, { diverted: true });
     }
 
     await supabase.from("subscriptions").update(update).eq("id", sub.id);
@@ -253,8 +306,9 @@ async function processJob(job: any) {
       } else if (hasDeparted(flight)) {
         await supabase.from("subscriptions").update({ phase: "ARRIVAL_TRACKING", retry_count: 0 }).eq("id", sub.id);
         const eta = arrivalEta(flight, arrEst);
-        const next = new Date(eta.getTime() + 5 * 60 * 1000);
-        await scheduleJob(sub.id, "CHECK_ARRIVAL", "ARRIVAL_TRACKING", next < now ? new Date(now.getTime() + 60_000) : next);
+        const minutesToEta = Math.round((eta.getTime() - now.getTime()) / 60000);
+        const waitMin = minutesToEta > 30 ? Math.min(minutesToEta - 5, 60) : 10;
+        await scheduleJob(sub.id, "CHECK_ARRIVAL", "ARRIVAL_TRACKING", new Date(now.getTime() + waitMin * 60 * 1000));
       } else {
         const rc = sub.retry_count + 1;
         if (rc >= 3) {
