@@ -306,9 +306,10 @@ async function processJob(job: any) {
       } else if (hasDeparted(flight)) {
         await supabase.from("subscriptions").update({ phase: "ARRIVAL_TRACKING", retry_count: 0 }).eq("id", sub.id);
         const eta = arrivalEta(flight, arrEst);
-        const minutesToEta = Math.round((eta.getTime() - now.getTime()) / 60000);
-        const waitMin = minutesToEta > 30 ? Math.min(minutesToEta - 5, 60) : 10;
-        await scheduleJob(sub.id, "CHECK_ARRIVAL", "ARRIVAL_TRACKING", new Date(now.getTime() + waitMin * 60 * 1000));
+        // Start arrival tracking 10 min before estimated (or scheduled) arrival
+        const startAt = new Date(eta.getTime() - 10 * 60 * 1000);
+        const runAt = startAt < now ? new Date(now.getTime() + 60 * 1000) : startAt;
+        await scheduleJob(sub.id, "CHECK_ARRIVAL", "ARRIVAL_TRACKING", runAt);
       } else {
         const rc = sub.retry_count + 1;
         if (rc >= 3) {
@@ -329,10 +330,8 @@ async function processJob(job: any) {
         if (rc >= 5) {
           await supabase.from("subscriptions").update({ status: "FAILED", phase: "ARRIVAL_NOT_DETECTED" }).eq("id", sub.id);
         } else {
-          // If ETA is far away, sleep until ~5 min before; otherwise poll every 10 min
-          let waitMin: number;
-          if (minutesToEta > 30) waitMin = Math.min(minutesToEta - 5, 60);
-          else waitMin = 10;
+          // Within the 10-min pre-arrival window — poll every 2 min until landed
+          const waitMin = minutesToEta > 10 ? Math.min(minutesToEta - 10, 60) : 2;
           await supabase.from("subscriptions").update({ retry_count: rc }).eq("id", sub.id);
           await scheduleJob(sub.id, "CHECK_ARRIVAL", "ARRIVAL_TRACKING", new Date(now.getTime() + waitMin * 60 * 1000));
         }
