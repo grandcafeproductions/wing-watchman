@@ -129,6 +129,20 @@ function arrivalEta(f: any, fallback: Date): Date {
   return fallback;
 }
 
+function validDate(value: string | null | undefined): Date | null {
+  if (!value) return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function preferEstimatedTime(estimated: string | null | undefined, scheduled: string | null | undefined, fallback: Date): Date {
+  return validDate(estimated) ?? validDate(scheduled) ?? fallback;
+}
+
+function soonestFuture(target: Date, now: Date, fallbackMs = 60_000): Date {
+  return target > now ? target : new Date(now.getTime() + fallbackMs);
+}
+
 async function logCall(subId: string, jobId: string | null, endpoint: string, params: any, r: any) {
   await supabase.from("api_call_logs").insert({
     subscription_id: subId,
@@ -284,22 +298,26 @@ async function processJob(job: any) {
 
     await supabase.from("subscriptions").update(update).eq("id", sub.id);
 
-    // Schedule next phase
-    const depEst = update.dep_estimated_utc ? new Date(update.dep_estimated_utc) : depUtc;
-    const arrEst = update.arr_estimated_utc ? new Date(update.arr_estimated_utc) : (sub.arr_time_utc ? new Date(sub.arr_time_utc) : new Date(depEst.getTime() + 2 * 3600 * 1000));
+    // Schedule each next check from the latest estimated time first, then scheduled time.
+    const depEst = preferEstimatedTime(update.dep_estimated_utc, sub.dep_time_utc, depUtc);
+    const arrEst = preferEstimatedTime(
+      update.arr_estimated_utc,
+      update.arr_time_utc ?? sub.arr_time_utc,
+      new Date(depEst.getTime() + 2 * 3600 * 1000),
+    );
 
     if (phase === "START_TRACKING") {
       const next = new Date(depEst.getTime() - 2 * 3600 * 1000);
       await supabase.from("subscriptions").update({ phase: "PRE_DEPARTURE" }).eq("id", sub.id);
-      await scheduleJob(sub.id, "CHECK_SCHEDULE", "PRE_DEPARTURE", next < now ? new Date(now.getTime() + 60_000) : next);
+      await scheduleJob(sub.id, "CHECK_SCHEDULE", "PRE_DEPARTURE", soonestFuture(next, now));
     } else if (phase === "PRE_DEPARTURE") {
       const next = new Date(depEst.getTime() - 10 * 60 * 1000);
       await supabase.from("subscriptions").update({ phase: "FINAL_PRE_DEPARTURE" }).eq("id", sub.id);
-      await scheduleJob(sub.id, "CHECK_DEPARTURE", "FINAL_PRE_DEPARTURE", next < now ? new Date(now.getTime() + 60_000) : next);
+      await scheduleJob(sub.id, "CHECK_DEPARTURE", "FINAL_PRE_DEPARTURE", soonestFuture(next, now));
     } else if (phase === "FINAL_PRE_DEPARTURE") {
       const next = new Date(depEst.getTime() + 10 * 60 * 1000);
       await supabase.from("subscriptions").update({ phase: "DEPARTURE_TRACKING", retry_count: 0 }).eq("id", sub.id);
-      await scheduleJob(sub.id, "CHECK_DEPARTURE", "DEPARTURE_TRACKING", next < now ? new Date(now.getTime() + 60_000) : next);
+      await scheduleJob(sub.id, "CHECK_DEPARTURE", "DEPARTURE_TRACKING", soonestFuture(next, now));
     } else if (phase === "DEPARTURE_TRACKING") {
       if (hasArrived(flight)) {
         await supabase.from("subscriptions").update({ status: "COMPLETED", phase: "COMPLETED" }).eq("id", sub.id);
@@ -308,9 +326,14 @@ async function processJob(job: any) {
         const eta = arrivalEta(flight, arrEst);
         // Start arrival tracking 10 min before estimated (or scheduled) arrival
         const startAt = new Date(eta.getTime() - 10 * 60 * 1000);
-        const runAt = startAt < now ? new Date(now.getTime() + 60 * 1000) : startAt;
-        await scheduleJob(sub.id, "CHECK_ARRIVAL", "ARRIVAL_TRACKING", runAt);
+        await scheduleJob(sub.id, "CHECK_ARRIVAL", "ARRIVAL_TRACKING", soonestFuture(startAt, now));
       } else {
+        const nextFromEstimate = new Date(depEst.getTime() + 10 * 60 * 1000);
+        if (nextFromEstimate > now) {
+          await supabase.from("subscriptions").update({ retry_count: 0 }).eq("id", sub.id);
+          await scheduleJob(sub.id, "CHECK_DEPARTURE", "DEPARTURE_TRACKING", nextFromEstimate);
+          return finalizeJob(job.id, { rescheduled_to_estimated_departure: nextFromEstimate.toISOString() });
+        }
         const rc = sub.retry_count + 1;
         if (rc >= 3) {
           await supabase.from("subscriptions").update({ status: "FAILED", phase: "DEPARTURE_NOT_DETECTED" }).eq("id", sub.id);
@@ -326,6 +349,12 @@ async function processJob(job: any) {
         // Still en-route — re-poll near updated ETA
         const eta = arrivalEta(flight, arrEst);
         const minutesToEta = Math.round((eta.getTime() - now.getTime()) / 60000);
+        const nextFromEstimate = new Date(eta.getTime() - 10 * 60 * 1000);
+        if (nextFromEstimate > now) {
+          await supabase.from("subscriptions").update({ retry_count: 0 }).eq("id", sub.id);
+          await scheduleJob(sub.id, "CHECK_ARRIVAL", "ARRIVAL_TRACKING", nextFromEstimate);
+          return finalizeJob(job.id, { rescheduled_to_estimated_arrival: nextFromEstimate.toISOString() });
+        }
         const rc = sub.retry_count + 1;
         if (rc >= 5) {
           await supabase.from("subscriptions").update({ status: "FAILED", phase: "ARRIVAL_NOT_DETECTED" }).eq("id", sub.id);
