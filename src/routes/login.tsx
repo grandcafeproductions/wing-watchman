@@ -12,12 +12,20 @@ export const Route = createFileRoute("/login")({
 
 function LoginPage() {
   const nav = useNavigate();
-  const [phone, setPhone] = useState("");
+  const [username, setUsername] = useState("");
   const [pwd, setPwd] = useState("");
+  const [error, setError] = useState("");
 
   const onSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    login();
+    setError("");
+
+    const ok = login(username, pwd);
+    if (!ok) {
+      setError("Invalid username or password.");
+      return;
+    }
+
     nav({ to: "/dashboard" });
   };
 
@@ -34,7 +42,7 @@ function LoginPage() {
           <h1 className="font-display text-5xl font-bold leading-tight">Live flight pulse, pushed at the right second.</h1>
           <p className="mt-4 text-white/85 text-lg">Smart scheduling. Hard limits. Zero wasted API calls.</p>
         </div>
-        <div className="text-xs text-white/70 z-10">© ChatB · Real-time aviation events</div>
+        <div className="text-xs text-white/70 z-10">ChatB - Real-time aviation events</div>
         <Plane className="absolute -right-12 -bottom-8 h-[420px] w-[420px] text-white/10" />
       </div>
 
@@ -46,18 +54,32 @@ function LoginPage() {
           </div>
           <div>
             <h2 className="font-display text-3xl font-bold">Sign in</h2>
-            <p className="text-sm text-muted-foreground mt-1">Enter your phone and password to continue.</p>
+            <p className="text-sm text-muted-foreground mt-1">Enter your username and password to continue.</p>
           </div>
           <div className="space-y-2">
-            <Label htmlFor="phone">Phone number</Label>
-            <Input id="phone" placeholder="+91 9XXXXXXXXX" value={phone} onChange={(e) => setPhone(e.target.value)} />
+            <Label htmlFor="username">Username</Label>
+            <Input
+              id="username"
+              type="email"
+              autoComplete="username"
+              placeholder="info@grandcafeadvertising.com"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+            />
           </div>
           <div className="space-y-2">
             <Label htmlFor="pwd">Password</Label>
-            <Input id="pwd" type="password" placeholder="••••••••" value={pwd} onChange={(e) => setPwd(e.target.value)} />
+            <Input
+              id="pwd"
+              type="password"
+              autoComplete="current-password"
+              placeholder="Password"
+              value={pwd}
+              onChange={(e) => setPwd(e.target.value)}
+            />
           </div>
+          {error && <p className="text-sm text-destructive">{error}</p>}
           <Button type="submit" className="w-full">Sign in</Button>
-          <p className="text-xs text-muted-foreground text-center">Demo login — any value works.</p>
         </form>
       </div>
     </div>
