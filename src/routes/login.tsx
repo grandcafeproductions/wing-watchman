@@ -20,6 +20,11 @@ function LoginPage() {
     e.preventDefault();
     setError("");
 
+    if (!username.trim() || !pwd) {
+      setError("Username and password are required.");
+      return;
+    }
+
     const ok = login(username, pwd);
     if (!ok) {
       setError("Invalid username or password.");

@@ -1,13 +1,11 @@
 import { createFileRoute, Outlet, Link, useNavigate, useLocation, redirect } from "@tanstack/react-router";
 import { Plane, LayoutDashboard, PlusCircle, ListChecks, Cloud, LogOut } from "lucide-react";
-import { logout } from "@/lib/auth";
+import { isLoggedIn, logout } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 
 export const Route = createFileRoute("/dashboard")({
   beforeLoad: () => {
-    if (typeof window !== "undefined") {
-      if (localStorage.getItem("chatb_auth") !== "1") throw redirect({ to: "/login" });
-    }
+    if (typeof window !== "undefined" && !isLoggedIn()) throw redirect({ to: "/login" });
   },
   component: DashboardLayout,
 });
